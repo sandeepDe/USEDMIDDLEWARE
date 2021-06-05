@@ -1,0 +1,208 @@
+const { format } = require("date-fns");
+
+const express = require("express");
+const app = express();
+app.use(express.json());
+const { open } = require("sqlite");
+const sqlite3 = require("sqlite3");
+const path = require("path");
+const dbPath = path.join(__dirname, "todoApplication.db");
+
+let db = null;
+
+const initializeDBAndServer = async () => {
+  try {
+    db = await open({
+      filename: dbPath,
+      driver: sqlite3.Database,
+    });
+    app.listen(3000, () => {
+      console.log("server is running at http://localhost:3000");
+    });
+  } catch (e) {
+    console.log(`DATABASE ERROR ${e.message}`);
+    process.exit(1);
+  }
+};
+initializeDBAndServer();
+
+const havingStatus = (queryObj) => {
+  return queryObj.status !== undefined;
+};
+
+const havingPriority = (queryObj) => {
+  return queryObj.priority !== undefined;
+};
+
+const havingStatusAndPriority = (queryObj) => {
+  return queryObj.status !== undefined && queryObj.priority !== undefined;
+};
+
+const havingSearch_q = (queryObj) => {
+  return queryObj.search_q !== undefined;
+};
+
+const havingCategoryAndStatus = (queryObj) => {
+  return queryObj.status !== undefined && queryObj.category !== undefined;
+};
+
+const havingCategory = (queryObj) => {
+  return queryObj.category !== undefined;
+};
+
+const havingCategoryAndPriority = (queryObj) => {
+  return queryObj.category !== undefined && queryObj.priority !== undefined;
+};
+
+
+
+//RESPONSE OBJECT
+
+const responsePattern = (obj) => {
+  return {
+    id: obj.id,
+    todo: obj.todo,
+    priority: obj.priority,
+    status: obj.status,
+    category: obj.category,
+    dueDate: obj.due_date,
+  };
+};
+
+//MIDDLEWARE FUNCTIONS
+
+const statusMiddleWare = (request, response, next) => {
+  const obj = request.query;
+  //console.log(obj);
+  let validate = "status" in obj;
+  if (validate) {
+    if (
+      obj.status === "TO DO" ||
+      obj.status === "IN PROGRESS" ||
+      obj.status === "DONE"
+    ) {
+      next();
+    } else {
+      response.status(400);
+      response.send("Invalid Todo Status");
+    }
+  } else {
+    next();
+  }
+};
+
+const priorityMiddleWare = (request, response, next) => {
+  const obj = request.query;
+  //console.log(obj);
+  let validate = "priority" in obj;
+  if (validate) {
+    if (
+      obj.priority === "HIGH" ||
+      obj.priority === "MEDIUM" ||
+      obj.priority === "LOW"
+    ) {
+      next();
+    } else {
+      response.status(400);
+      response.send("Invalid Todo Priority");
+    }
+  } else {
+    next();
+  }
+};
+
+const categoryMiddleWare = (request, response, next) => {
+  const obj = request.query;
+  //console.log(obj);
+  let validate = "category" in obj;
+  if (validate) {
+    if (
+      obj.category === "WORK" ||
+      obj.category === "HOME" ||
+      obj.category === "LEARNING"
+    ) {
+      next();
+    } else {
+      response.status(400);
+      response.send("Invalid Todo Category");
+    }
+  } else {
+    next();
+  }
+};
+
+const testing = (request, response, next) => {
+  console.log("hello");
+};
+
+app.get(
+  "/todos/",
+  statusMiddleWare,
+  priorityMiddleWare,
+  categoryMiddleWare,
+
+  async (request, response) => {
+    //console.log("hello");
+    let getQuery = "";
+    const queryObj = request.query;
+    // console.log(queryObj.status);
+    switch (true) {
+      case havingStatusAndPriority(queryObj):
+        getQuery = `
+            SELECT 
+              *  
+            FROM todo
+            WHERE status LIKE '${queryObj.status}'
+            AND priority LIKE '${queryObj.priority}'
+           ;`;
+
+        break;
+      case havingStatus(queryObj):
+        getQuery = `
+          SELECT * FROM todo
+          WHERE status = '${queryObj.status}';
+          
+        `;
+
+        break;
+      case havingPriority(queryObj):
+        getQuery = `
+          SELECT 
+             * 
+          FROM todo
+          WHERE priority = '${queryObj.priority}';`;
+        break;
+      case havingSearch_q(queryObj):
+        getQuery = `
+          SELECT * FROM todo
+          WHERE todo LIKE '%${queryObj.search_q}%';`;
+        break;
+
+      case havingCategoryAndPriority(queryObj):
+        getQuery = `
+          SELECT 
+            * 
+          FROM 
+            todo
+          WHERE category = '${queryObj.category}'
+          AND 
+          priority = '${queryObj.priority}';`;
+        break;
+      case havingCategoryAndStatus(queryObj):
+        getQuery = `
+          SELECT * FROM todo
+          WHERE category = '${queryObj.category}'
+          AND 
+          status = '${queryObj.status}';`;
+        break;
+      case havingCategory(queryObj):
+        getQuery = `
+            SELECT * FROM todo
+            WHERE category = '${queryObj.category}';`;
+        break;
+
+      default:
+        break;
+    }
+  }
+);
